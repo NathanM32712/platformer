@@ -1,0 +1,759 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<title>Text Map Platformer — Ghost Rooms</title>
+<meta name="viewport" content="width=device-width,initial-scale=1" />
+<style>
+  :root{
+    --bg:#202335; --panel:#2a2e45; --accent:#58c4ff; --danger:#ff6961;
+    --ok:#77dd77; --text:#e7e7ee; --muted:#a6a8b9;
+  }
+  html,body{margin:0;height:100%;background:var(--bg);color:var(--text);font-family:ui-sans-serif,system-ui,-apple-system,Segoe UI,Roboto,Helvetica,Arial}
+  .wrap{display:grid;grid-template-columns:360px 1fr;grid-template-rows:auto 1fr;gap:12px;padding:12px;height:100%;box-sizing:border-box}
+  header{grid-column:1/-1;display:flex;align-items:center;gap:12px}
+  header h1{font-size:18px;margin:0}
+  .controls{display:flex;gap:8px;flex-wrap:wrap}
+  button,select{background:var(--panel);color:var(--text);border:1px solid #3a3f5f;padding:6px 10px;border-radius:8px;cursor:pointer}
+  button.primary{background:var(--accent);color:#0c1220;border-color:#66d3ff;font-weight:600}
+  .panel{background:var(--panel);border:1px solid #3a3f5f;border-radius:12px;padding:12px;display:flex;flex-direction:column;gap:10px;min-height:0}
+  .legend{display:grid;grid-template-columns:1fr 1fr;gap:8px;font-size:13px}
+  .swatch{width:18px;height:18px;border-radius:4px;border:1px solid #0003}
+  textarea#mapInput{width:100%;height:240px;min-height:240px;max-height:240px;overflow-x:auto;overflow-y:auto;resize:none;white-space:pre;word-wrap:normal;background:#1e2133;color:var(--text);border:1px solid #3a3f5f;border-radius:10px;padding:8px;font-family:Menlo,Consolas,monospace;line-height:1.25}
+  .row{display:flex;gap:8px;align-items:center;flex-wrap:wrap}
+  .note{color:var(--muted);font-size:12px}
+  canvas{background:#88c6ff;border:1px solid #3a3f5f;border-radius:12px;width:100%;height:100%}
+  .hud{position:absolute;top:18px;right:18px;background:#0d1322bb;border:1px solid #3a3f5f;color:var(--text);padding:8px 10px;border-radius:10px;font-size:12px}
+  .toast{position:absolute;left:50%;transform:translateX(-50%);bottom:18px;background:#0d1322bb;border:1px solid #3a3f5f;color:var(--text);padding:8px 12px;border-radius:10px;font-size:12px;opacity:0;transition:opacity .3s;pointer-events:none}
+  .toast.show{opacity:1}
+  .game-wrap{position:relative;height:calc(100vh - 120px)}
+  .overlay{position:absolute;inset:0;display:grid;place-items:center;background:#0b1025cc;backdrop-filter:blur(2px);opacity:0;pointer-events:none;transition:opacity .25s}
+  .overlay.show{opacity:1;pointer-events:auto}
+  .overlay .card{background:#151a33;border:1px solid #3a3f5f;border-radius:14px;padding:18px;width:min(520px,90%);text-align:center}
+  .overlay h2{margin:0 0 10px 0;font-size:20px;color:#fffb}
+  .overlay p{margin:0 0 12px 0;color:var(--muted)}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <h1>Text Map Platformer — Ghost Rooms</h1>
+    <div class="controls">
+      <select id="levelSelect" title="Built-in levels"></select>
+      <button id="loadBtn" class="primary">Load typed map</button>
+      <button id="restartBtn">Restart</button>
+      <button id="pauseBtn">Pause</button>
+      <button id="helpBtn">Help</button>
+    </div>
+  </header>
+
+  <div class="panel">
+    <div class="row">
+      <strong>Map editor</strong>
+      <span class="note">Editor fixed height; long lines scroll horizontally (wrap off). Ghost rooms 'g' are background-only rectangles (non-solid).</span>
+    </div>
+    <textarea id="mapInput" wrap="off" spellcheck="false"></textarea>
+    <div class="row">
+      <button id="validateBtn">Validate</button>
+      <span id="validateMsg" class="note"></span>
+    </div>
+
+    <strong>Legend</strong>
+    <div class="legend">
+      <div><span class="swatch" style="background:transparent;border:1px dashed #fff3"></span> <code>A</code> Air</div>
+      <div><span class="swatch" style="background:#7a4f2d"></span> <code>b</code> Block</div>
+      <div><span class="swatch" style="background:#9b5e34"></span> <code>B</code> Breakable brick</div>
+      <div><span class="swatch" style="background:#ffd24d"></span> <code>c</code> Coin</div>
+      <div><span class="swatch" style="background:#c33"></span> <code>^</code> Spike</div>
+      <div><span class="swatch" style="background:#66ddff"></span> <code>s</code> Spring</div>
+      <div><span class="swatch" style="background:#7a6fff"></span> <code>h</code> Platform (horizontal)</div>
+      <div><span class="swatch" style="background:#7a6fff"></span> <code>v</code> Platform (vertical)</div>
+      <div><span class="swatch" style="background:#5fd866"></span> <code>G</code> Goal</div>
+      <div><span class="swatch" style="background:#333"></span> <code>#</code> Player start</div>
+      <div><span class="swatch" style="background:#444"></span> <code>w</code> One-way floor</div>
+      <div><span class="swatch" style="background:#4a3a2a"></span> <code>g</code> Ghost background room (non-solid)</div>
+    </div>
+
+    <div class="note">Controls: ← → move, ↑ jump. R restart, P pause, Enter restart/next. 1–9 quick-load levels.</div>
+  </div>
+
+  <div class="panel game-wrap">
+    <canvas id="game" width="1280" height="720"></canvas>
+    <div class="hud" id="hud"></div>
+    <div class="toast" id="toast"></div>
+
+    <div class="overlay" id="deathOverlay" aria-hidden="true">
+      <div class="card">
+        <h2>You died</h2>
+        <p>Press R or Enter to restart, or click the button.</p>
+        <div class="row" style="justify-content:center;">
+          <button id="overlayRestartBtn" class="danger">Restart</button>
+        </div>
+      </div>
+    </div>
+
+    <div class="overlay" id="winOverlay" aria-hidden="true">
+      <div class="card">
+        <h2>Level complete!</h2>
+        <p>Next level loads in 2 seconds. Press Enter to go now.</p>
+        <div class="row" style="justify-content:center;">
+          <button id="overlayNextBtn" class="ok">Next level</button>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+/* CONFIG */
+const TILE = 32;
+const MAX_STEPS = 5;
+const GRAVITY = 1800;
+const MOVE_ACCEL = 8000;
+const MOVE_MAX = 240;
+const FRICTION = 0.86;
+const AIR_CONTROL = 0.35;
+const JUMP_VEL = 640;
+const SPRING_VEL = 860;
+const COYOTE_TIME = 0.12;
+const JUMP_BUFFER = 0.12;
+const CAMERA_LERP = 0.16;
+const MOVING_PLATFORM_SPEED = 80;
+
+/* helper */
+function padRows(rows, width) { return rows.map(r => r.padEnd(width, 'A')).join('\n'); }
+
+/* built-in levels */
+const BUILT_LEVELS = [
+  { name: "1: Huge Unique 300×15 Map (ghost rooms)", map: null }
+];
+
+/* STATE */
+const canvas = document.getElementById('game');
+const ctx = canvas.getContext('2d');
+const hud = document.getElementById('hud');
+const toast = document.getElementById('toast');
+const deathOverlay = document.getElementById('deathOverlay');
+const winOverlay = document.getElementById('winOverlay');
+const overlayRestartBtn = document.getElementById('overlayRestartBtn');
+const overlayNextBtn = document.getElementById('overlayNextBtn');
+
+const mapInput = document.getElementById('mapInput');
+const levelSelect = document.getElementById('levelSelect');
+const loadBtn = document.getElementById('loadBtn');
+const validateBtn = document.getElementById('validateBtn');
+const validateMsg = document.getElementById('validateMsg');
+const restartBtn = document.getElementById('restartBtn');
+const pauseBtn = document.getElementById('pauseBtn');
+const helpBtn = document.getElementById('helpBtn');
+
+let currentLevelIndex = 0;
+let world = null;
+let player = null;
+let camera = { x: 0, y: 0 };
+let keys = new Set();
+let paused = false;
+let lastTime = performance.now();
+let autoNextTimer = null;
+
+/* UTIL */
+function showToast(msg){ toast.textContent = msg; toast.classList.add('show'); setTimeout(()=>toast.classList.remove('show'),1400); }
+function clamp(v,a,b){return Math.max(a,Math.min(b,v));}
+function rectsOverlap(a,b){return !(a.x+a.w<=b.x||b.x+b.w<=a.x||a.y+a.h<=b.y||b.y+a.h<=a.y);}
+function tileRect(col,row){return { x: col*TILE, y: row*TILE, w: TILE, h: TILE };}
+
+/* moving platform rect */
+function getTileRect(col,row,t,world){
+  if(t==='h'||t==='v'){
+    const mp = world.movingPlatforms.find(M=>M.c===col&&M.r===row);
+    const base = tileRect(col,row);
+    if(!mp) return base;
+    return { x: base.x + (mp.offsetX||0), y: base.y + (mp.offsetY||0), w: base.w, h: base.h };
+  }
+  return tileRect(col,row);
+}
+function forEachTile(rect,cb,world){
+  const c0 = Math.floor(rect.x / TILE), c1 = Math.floor((rect.x + rect.w - 1) / TILE);
+  const r0 = Math.floor(rect.y / TILE), r1 = Math.floor((rect.y + rect.h - 1) / TILE);
+  for(let r=r0;r<=r1;r++) for(let c=c0;c<=c1;c++) cb(c,r,world.tiles[r]?.[c]);
+}
+function parseMap(text){
+  const rows = text.trim().split(/\r?\n/).map(r=>r.replace(/\s+$/,''));
+  const w = Math.max(...rows.map(r=>r.length));
+  if(!rows.length || w===0) throw new Error('Map is empty.');
+  for(let i=0;i<rows.length;i++) if(rows[i].length !== w) throw new Error(`Row ${i+1} length ${rows[i].length} != ${w}. All rows must be equal width.`);
+  return { tiles: rows.map(r=>[...r]), width: w, height: rows.length };
+}
+
+/* ENSURE: every '#' has a block under it */
+function ensureBlocksUnderAllStarts(world) {
+  const H = world.height, W = world.width;
+  const starts = [];
+  for (let r=0;r<H;r++) for (let c=0;c<W;c++) if (world.tiles[r][c] === '#') starts.push({r,c});
+  for (const s of starts){
+    let r = s.r, c = s.c;
+    if (r >= H - 1) {
+      const newR = Math.max(0, H - 2);
+      world.tiles[r][c] = 'b';
+      world.tiles[newR][c] = '#';
+      r = newR;
+    }
+    const belowR = r + 1;
+    if (belowR < H) {
+      const below = world.tiles[belowR][c];
+      if (!below || below === 'A' || below === 'c' || below === 'w' || below === 'g') {
+        world.tiles[belowR][c] = 'b';
+      }
+    }
+  }
+}
+
+/* BUILD WORLD */
+function buildWorld(mapText){
+  const grid = parseMap(mapText);
+  const world = {
+    tiles: grid.tiles,
+    width: grid.width,
+    height: grid.height,
+    coins: new Set(),
+    movingPlatforms: [],
+    bricks: new Set(),
+    springs: new Set(),
+    spikes: new Set(),
+    goals: new Set(),
+    oneWay: new Set()
+  };
+
+  ensureBlocksUnderAllStarts(world);
+
+  let start = null;
+  for(let r=0;r<world.height;r++){
+    for(let c=0;c<world.width;c++){
+      const t = world.tiles[r][c], id = r+','+c;
+      if(t==='c') world.coins.add(id);
+      if(t==='B') world.bricks.add(id);
+      if(t==='^') world.spikes.add(id);
+      if(t==='s') world.springs.add(id);
+      if(t==='h'||t==='v') world.movingPlatforms.push({ c, r, type: t, tAccum:0, offsetX:0, offsetY:0, prevOffsetX:0, prevOffsetY:0 });
+      if(t==='G') world.goals.add(id);
+      if(t==='w') world.oneWay.add(id);
+      if(t==='#' && !start) start = { c, r };
+    }
+  }
+
+  if(!start){ start = { c: 2, r: 2 }; showToast('No player start (#). Using default.'); }
+
+  const player = { x: start.c*TILE, y: start.r*TILE, w: TILE*0.8, h: TILE*0.95, vx:0, vy:0, onGround:false, coyote:0, jumpBuffer:0, coins:0, alive:true, win:false, carriedBy:null };
+  return { world, player };
+}
+
+/* INPUT */
+window.addEventListener('keydown', (e) => {
+  const k = e.key;
+  if(['ArrowLeft','ArrowRight','ArrowUp'].includes(k)) e.preventDefault();
+  keys.add(k);
+  if(k==='Enter'){ if(player?.win) nextLevel(); else restartLevel(); }
+  if(k==='r'||k==='R') restartLevel();
+  if(k==='p'||k==='P') togglePause();
+  if(k>='1' && k<='9'){ const idx = k.charCodeAt(0)-'1'.charCodeAt(0); if(BUILT_LEVELS[idx]){ currentLevelIndex = idx; mapInput.value = BUILT_LEVELS[idx].map; loadFromInput(); levelSelect.value = String(idx); showToast(`Loaded level ${idx+1}`); } }
+});
+window.addEventListener('keyup', (e) => keys.delete(e.key));
+
+/* PHYSICS & COLLISIONS
+   Ghost 'g' is background-only (non-solid).
+*/
+function isSolid(t){ return t==='b' || t==='B' || t==='h' || t==='v'; }
+function isOneWay(t){ return t==='w'; }
+
+function collide(world, rect, dx, dy){
+  let resolvedX = dx, resolvedY = dy;
+  rect.x += resolvedX;
+  let hitX = null;
+  forEachTile(rect, (c,r,t) => {
+    if(!t) return;
+    if(isSolid(t)){
+      const tileR = getTileRect(c,r,t,world);
+      if(rectsOverlap(rect, tileR)){
+        if(resolvedX > 0){ rect.x = tileR.x - rect.w; hitX = { c, r, side: 'right', t }; }
+        else if(resolvedX < 0){ rect.x = tileR.x + tileR.w; hitX = { c, r, side: 'left', t }; }
+        resolvedX = 0;
+      }
+    }
+  }, world);
+
+  rect.y += resolvedY;
+  let hitY = null;
+  forEachTile(rect, (c,r,t) => {
+    if(!t) return;
+    const tileR = getTileRect(c,r,t,world);
+    if(isSolid(t) || isOneWay(t)){
+      if(!rectsOverlap(rect, tileR)) return;
+      if(isOneWay(t)){
+        const prevBottom = rect.y - resolvedY + rect.h;
+        const top = tileR.y;
+        const crossingDown = (resolvedY > 0) && (prevBottom <= top) && (rect.y + rect.h >= top);
+        if(!crossingDown) return;
+      }
+      if(resolvedY > 0){ rect.y = tileR.y - rect.h; hitY = { c, r, side: 'bottom', t }; }
+      else if(resolvedY < 0){ rect.y = tileR.y + tileR.h; hitY = { c, r, side: 'top', t }; }
+      resolvedY = 0;
+    }
+  }, world);
+
+  return { hitX, hitY, dx: resolvedX, dy: resolvedY };
+}
+
+function updateMovingPlatforms(dt, world){
+  for(const p of world.movingPlatforms){
+    p.tAccum += dt;
+    const span = 3 * TILE;
+    const phase = Math.sin(p.tAccum * (MOVING_PLATFORM_SPEED / span)) * span;
+    p.prevOffsetX = p.offsetX; p.prevOffsetY = p.offsetY;
+    if(p.type === 'h'){ p.offsetX = phase; p.offsetY = 0; } else { p.offsetX = 0; p.offsetY = phase; }
+  }
+}
+
+function applyMovingPlatformCarry(player, world){
+  player.carriedBy = null;
+  const feetRect = { x: player.x, y: player.y + player.h, w: player.w, h: 2 };
+  const c0 = Math.floor(feetRect.x / TILE), c1 = Math.floor((feetRect.x + feetRect.w - 1) / TILE);
+  const r0 = Math.floor(feetRect.y / TILE), r1 = Math.floor((feetRect.y + feetRect.h - 1) / TILE);
+  for(let r=r0;r<=r1;r++) for(let c=c0;c<=c1;c++){
+    const t = world.tiles[r]?.[c];
+    if(t === 'h' || t === 'v'){
+      const tileR = getTileRect(c,r,t,world);
+      const overlaps = rectsOverlap(feetRect, tileR);
+      const touchingTop = Math.abs(tileR.y - (player.y + player.h)) <= 2;
+      if(overlaps || touchingTop) player.carriedBy = world.movingPlatforms.find(M => M.c === c && M.r === r);
+    }
+  }
+  if(player.carriedBy && player.onGround){
+    player.x += (player.carriedBy.offsetX - (player.carriedBy.prevOffsetX || 0));
+    player.y += (player.carriedBy.offsetY - (player.carriedBy.prevOffsetY || 0));
+  }
+}
+
+function triggerDeath(reason='You died'){
+  if(!player.alive) return;
+  player.alive = false;
+  paused = true;
+  showToast(reason);
+  deathOverlay.classList.add('show');
+  deathOverlay.setAttribute('aria-hidden','false');
+}
+
+function triggerWin(){
+  if(player.win) return;
+  player.win = true;
+  paused = true;
+  showToast('Level complete!');
+  winOverlay.classList.add('show');
+  winOverlay.setAttribute('aria-hidden','false');
+  if(autoNextTimer) clearTimeout(autoNextTimer);
+  autoNextTimer = setTimeout(() => nextLevel(), 2000);
+}
+
+function updatePlayer(dt, world, player){
+  const left = keys.has('ArrowLeft');
+  const right = keys.has('ArrowRight');
+  const up = keys.has('ArrowUp');
+
+  const accel = player.onGround ? MOVE_ACCEL : MOVE_ACCEL * AIR_CONTROL;
+  if(left && !right) player.vx -= accel * dt;
+  else if(right && !left) player.vx += accel * dt;
+  else if(player.onGround) player.vx *= FRICTION;
+
+  player.vx = clamp(player.vx, -MOVE_MAX, MOVE_MAX);
+
+  if(up) player.jumpBuffer = JUMP_BUFFER;
+  else player.jumpBuffer = Math.max(0, player.jumpBuffer - dt);
+
+  player.vy += GRAVITY * dt;
+  player.vy = Math.min(player.vy, 1500);
+
+  const steps = MAX_STEPS;
+  let px = player.x, py = player.y;
+  let vx = player.vx, vy = player.vy;
+  let groundedThisFrame = false;
+
+  for(let i=0;i<steps;i++){
+    const subdt = dt / steps;
+    const dx = vx * subdt;
+    const dy = vy * subdt;
+
+    const rect = { x: px, y: py, w: player.w, h: player.h };
+    const res = collide(world, rect, dx, dy);
+
+    if(res.hitY && res.hitY.side === 'top' && res.hitY.t === 'B'){
+      world.tiles[res.hitY.r][res.hitY.c] = 'A';
+      showToast('Bonk! Brick broken');
+    }
+
+    if(res.hitY && res.hitY.side === 'bottom') groundedThisFrame = true;
+
+    // coins
+    forEachTile({ x: rect.x, y: rect.y, w: rect.w, h: rect.h }, (c,r,t) => {
+      if(t === 'c'){ world.tiles[r][c] = 'A'; player.coins++; showToast('Coin +1'); }
+    }, world);
+
+    // spikes
+    let spiked = false;
+    forEachTile({ x: rect.x, y: rect.y, w: rect.w, h: rect.h }, (c,r,t) => { if(t === '^') spiked = true; }, world);
+    if(spiked){ px = rect.x; py = rect.y; triggerDeath('You died'); break; }
+
+    // springs
+    if(res.hitY && res.hitY.side === 'bottom'){
+      const t = world.tiles[res.hitY.r][res.hitY.c];
+      if(t === 's'){ vy = -SPRING_VEL; showToast('Boing!'); }
+    }
+
+    // goal
+    let reached = false;
+    forEachTile({ x: rect.x, y: rect.y, w: rect.w, h: rect.h }, (c,r,t) => { if(t === 'G') reached = true; }, world);
+    if(reached){ px = rect.x; py = rect.y; triggerWin(); break; }
+
+    px = rect.x; py = rect.y;
+    vx = res.dx / (subdt || 1e-9);
+    vy = res.dy / (subdt || 1e-9);
+  }
+
+  player.x = px; player.y = py; player.vx = vx; player.vy = vy;
+
+  if(groundedThisFrame){
+    if(!player.onGround) player.coyote = COYOTE_TIME;
+    player.onGround = true;
+    player.vy = Math.max(player.vy, 0);
+  } else {
+    player.onGround = false;
+    player.coyote = Math.max(0, player.coyote - dt);
+  }
+
+  if(player.jumpBuffer > 0 && (player.onGround || player.coyote > 0)){
+    player.vy = -JUMP_VEL;
+    player.onGround = false;
+    player.coyote = 0;
+    player.jumpBuffer = 0;
+  }
+
+  applyMovingPlatformCarry(player, world);
+
+  const killY = world.height * TILE + 200;
+  if(player.y > killY && player.alive && !player.win) triggerDeath('You died');
+}
+
+/* RENDER
+   Draw ghost rooms first (background), then everything else on top.
+*/
+function draw(world, player){
+  const targetX = player.x + player.w/2;
+  const targetY = player.y + player.h/2;
+  camera.x += (targetX - camera.x) * CAMERA_LERP;
+  camera.y += (targetY - camera.y) * CAMERA_LERP;
+
+  const viewW = canvas.width, viewH = canvas.height;
+  const cx = Math.floor(camera.x - viewW/2);
+  const cy = Math.floor(camera.y - viewH/2);
+
+  const grad = ctx.createLinearGradient(0,0,0,canvas.height);
+  grad.addColorStop(0, '#88c6ff');
+  grad.addColorStop(1, '#bde9ff');
+  ctx.fillStyle = grad;
+  ctx.fillRect(0,0,canvas.width,canvas.height);
+
+  const c0 = Math.floor(cx / TILE) - 1, c1 = Math.floor((cx + viewW) / TILE) + 1;
+  const r0 = Math.floor(cy / TILE) - 1, r1 = Math.floor((cy + viewH) / TILE) + 1;
+
+  // 1) draw ghost background rooms first (non-solid)
+  for(let r = Math.max(0, r0); r <= Math.min(world.height-1, r1); r++){
+    for(let c = Math.max(0, c0); c <= Math.min(world.width-1, c1); c++){
+      const t = world.tiles[r][c];
+      if(t !== 'g') continue;
+      const dyn = tileRect(c,r);
+      const x = dyn.x - cx, y = dyn.y - cy;
+      ctx.fillStyle = '#4a3a2a'; // darker background brick
+      ctx.fillRect(x,y,TILE,TILE);
+      ctx.strokeStyle = '#0006';
+      ctx.beginPath(); ctx.moveTo(x,y+14); ctx.lineTo(x+TILE,y+14); ctx.moveTo(x+12,y); ctx.lineTo(x+12,y+TILE); ctx.stroke();
+    }
+  }
+
+  // 2) draw all other tiles on top
+  for(let r = Math.max(0, r0); r <= Math.min(world.height-1, r1); r++){
+    for(let c = Math.max(0, c0); c <= Math.min(world.width-1, c1); c++){
+      const t = world.tiles[r][c];
+      if(!t || t === 'A' || t === 'g') continue; // skip air and ghost (already drawn)
+      const dyn = getTileRect(c, r, t, world);
+      const x = dyn.x - cx, y = dyn.y - cy;
+
+      switch(t){
+        case 'b': ctx.fillStyle = '#7a4f2d'; ctx.fillRect(x,y,TILE,TILE); ctx.strokeStyle='#0002'; ctx.beginPath(); ctx.moveTo(x,y+16); ctx.lineTo(x+TILE,y+16); ctx.moveTo(x+16,y); ctx.lineTo(x+16,y+TILE); ctx.stroke(); break;
+        case 'B': ctx.fillStyle = '#9b5e34'; ctx.fillRect(x,y,TILE,TILE); ctx.strokeStyle='#0003'; ctx.beginPath(); ctx.moveTo(x,y+16); ctx.lineTo(x+TILE,y+16); ctx.moveTo(x+16,y); ctx.lineTo(x+16,y+TILE); ctx.stroke(); break;
+        case 'c': ctx.save(); ctx.translate(x+TILE/2,y+TILE/2); ctx.fillStyle='#ffd24d'; ctx.beginPath(); ctx.arc(0,0,10,0,Math.PI*2); ctx.fill(); ctx.restore(); break;
+        case '^': ctx.fillStyle = '#c33'; for(let i=0;i<4;i++){ const bx = x + i*(TILE/4); ctx.beginPath(); ctx.moveTo(bx, y+TILE); ctx.lineTo(bx+TILE/8, y+TILE-14); ctx.lineTo(bx+TILE/4, y+TILE); ctx.closePath(); ctx.fill(); } break;
+        case 's': ctx.fillStyle = '#66ddff'; ctx.fillRect(x+2,y+TILE-12,TILE-4,10); break;
+        case 'h': case 'v': ctx.fillStyle = '#7a6fff'; ctx.fillRect(x,y,TILE,TILE); ctx.fillStyle = '#ffffff55'; ctx.fillRect(x,y+TILE-6,TILE,6); break;
+        case 'G': ctx.fillStyle = '#5fd866'; ctx.fillRect(x+TILE/2-3,y,6,TILE); ctx.fillStyle = '#66b36b'; ctx.fillRect(x+TILE/2-10,y+6,20,12); break;
+        case 'w': ctx.fillStyle = '#333'; ctx.fillRect(x,y+TILE-5,TILE,5); break;
+        case '#': ctx.strokeStyle = '#fff4'; ctx.strokeRect(x+4,y+4,TILE-8,TILE-8); break;
+      }
+    }
+  }
+
+  // draw player
+  const px = player.x - cx, py = player.y - cy;
+  ctx.save();
+  ctx.translate(px + player.w/2, py + player.h/2);
+  ctx.rotate(clamp(player.vx / MOVE_MAX, -1, 1) * 0.06);
+  ctx.fillStyle = '#e33';
+  ctx.fillRect(-player.w/2, -player.h/2, player.w, player.h);
+  ctx.fillStyle = '#fff';
+  ctx.fillRect(-8, -player.h/2+12, 6, 6);
+  ctx.fillRect(2, -player.h/2+12, 6, 6);
+  ctx.restore();
+
+  hud.innerHTML = `Level ${currentLevelIndex+1}/${BUILT_LEVELS.length} &nbsp;|&nbsp; Coins: ${player.coins}` +
+    ` &nbsp;|&nbsp; Pos: ${Math.floor(player.x)},${Math.floor(player.y)} &nbsp;|&nbsp; Vel: ${Math.floor(player.vx)},${Math.floor(player.vy)}` +
+    (paused ? ` &nbsp;|&nbsp; Paused` : '') + (player.win ? ` &nbsp;|&nbsp; You reached the goal!` : '') + (!player.alive ? ` &nbsp;|&nbsp; You died — Enter/R to restart.` : '');
+}
+
+/* GAME LOOP */
+function frame(ts){
+  const dt = Math.min(0.033, (ts - lastTime) / 1000);
+  lastTime = ts;
+  if(!paused && player?.alive && !player?.win){
+    updateMovingPlatforms(dt, world);
+    updatePlayer(dt, world, player);
+  }
+  draw(world, player);
+  requestAnimationFrame(frame);
+}
+
+/* NEW: Ghost-room placement helpers
+   - placeGhostRooms fills rectangular rooms with 'g' (background)
+   - rooms avoid overwriting solid ground row and leave at least one opening (door) so rooms feel like background chambers
+*/
+function placeGhostRooms(grid, cols, rows, attempts = 18) {
+  const W = cols, H = rows;
+  const rooms = [];
+  const minW = 6, maxW = 28;
+  const minH = 3, maxH = Math.min(8, H - 4);
+
+  for (let a = 0; a < attempts; a++) {
+    const rw = minW + Math.floor(Math.random() * (maxW - minW + 1));
+    const rh = minH + Math.floor(Math.random() * (maxH - minH + 1));
+    const rx = 6 + Math.floor(Math.random() * Math.max(1, W - 12 - rw));
+    const ry = 2 + Math.floor(Math.random() * Math.max(1, H - 6 - rh));
+
+    // check overlap score with existing rooms (allow some overlap but avoid near-duplicate)
+    let overlap = 0;
+    for (const r of rooms) {
+      const ox = Math.max(0, Math.min(r.x + r.w - 1, rx + rw - 1) - Math.max(r.x, rx) + 1);
+      const oy = Math.max(0, Math.min(r.y + r.h - 1, ry + rh - 1) - Math.max(r.y, ry) + 1);
+      if (ox > 0 && oy > 0) overlap += ox * oy;
+    }
+    if (overlap > (rw * rh * 0.45)) continue; // too much overlap, skip
+
+    // carve the room interior as ghost background
+    for (let yy = ry; yy < ry + rh; yy++) {
+      for (let xx = rx; xx < rx + rw; xx++) {
+        // don't overwrite goal or start if already placed later; ghost is background so it's okay to place over air/coins but avoid ground row
+        if (yy === H - 1) continue;
+        grid[yy][xx] = 'g';
+      }
+    }
+
+    // create 1-2 door openings in the room walls (leave air)
+    const doors = 1 + (Math.random() < 0.5 ? 1 : 0);
+    for (let d = 0; d < doors; d++) {
+      const side = Math.floor(Math.random() * 4);
+      if (side === 0) { // left wall
+        const dy = ry + 1 + Math.floor(Math.random() * Math.max(1, rh - 2));
+        grid[dy][rx] = 'A';
+      } else if (side === 1) { // right wall
+        const dy = ry + 1 + Math.floor(Math.random() * Math.max(1, rh - 2));
+        grid[dy][rx + rw - 1] = 'A';
+      } else if (side === 2) { // top wall
+        const dx = rx + 1 + Math.floor(Math.random() * Math.max(1, rw - 2));
+        grid[ry][dx] = 'A';
+      } else { // bottom wall
+        const dx = rx + 1 + Math.floor(Math.random() * Math.max(1, rw - 2));
+        if (ry + rh - 1 < H - 1) grid[ry + rh - 1][dx] = 'A';
+      }
+    }
+
+    // optionally scatter a coin or two inside the room
+    if (Math.random() < 0.7) {
+      const cx = rx + 1 + Math.floor(Math.random() * Math.max(1, rw - 2));
+      const cy = ry + 1 + Math.floor(Math.random() * Math.max(1, rh - 2));
+      if (grid[cy][cx] === 'g') grid[cy][cx] = 'c';
+    }
+    if (Math.random() < 0.25) {
+      const cx2 = rx + 1 + Math.floor(Math.random() * Math.max(1, rw - 2));
+      const cy2 = ry + 1 + Math.floor(Math.random() * Math.max(1, rh - 2));
+      if (grid[cy2][cx2] === 'g') grid[cy2][cx2] = 'c';
+    }
+
+    rooms.push({ x: rx, y: ry, w: rw, h: rh });
+  }
+  return rooms;
+}
+
+/* UNIQUE 300x15 MAP GENERATOR with ghost rooms */
+function generateUniqueMap(cols = 300, rows = 15) {
+  const W = cols, H = rows;
+  const grid = Array.from({length: H}, () => Array(W).fill('A'));
+  const groundRow = H - 1;
+
+  // baseline ground with variety
+  for (let x = 0; x < W; x++) {
+    if (x % 11 === 0) grid[groundRow][x] = 'B';
+    else grid[groundRow][x] = 'b';
+  }
+
+  // place ghost rooms (rectangular background areas)
+  placeGhostRooms(grid, W, H, 22);
+
+  // create varied platforming segments between rooms
+  const segments = Math.floor(W / 18);
+  for (let seg = 0; seg < segments; seg++) {
+    const baseX = seg * 18 + 6;
+    const pattern = seg % 7;
+    if (pattern === 0) {
+      const top = 2 + (seg % 4);
+      grid[H-4][baseX+2] = 'h';
+      grid[H-7][baseX+4] = 'v';
+      grid[H-2][baseX+1] = 'b';
+      grid[H-5][baseX+2] = 'c';
+    } else if (pattern === 1) {
+      for (let x = baseX; x < baseX + 12; x++) {
+        grid[H-4][x] = (Math.random() < 0.25) ? 'c' : 'A';
+        grid[H-2][x] = (x % 3 === 0) ? '^' : 'b';
+      }
+      grid[H-3][baseX+6] = 's';
+    } else if (pattern === 2) {
+      const top = H - 8 - (seg % 3);
+      for (let x = baseX; x < baseX + 14; x++) {
+        if (Math.random() < 0.12) grid[top+1][x] = 'c';
+        if (Math.random() < 0.06) grid[top+2][x] = 'h';
+      }
+    } else if (pattern === 3) {
+      for (let x = baseX; x < baseX + 14; x += 4) {
+        grid[H-6][x] = 'h';
+        grid[H-2][x+1] = 'b';
+      }
+      grid[H-7][baseX+7] = '^';
+      grid[H-5][baseX+2] = 'c';
+    } else if (pattern === 4) {
+      for (let x = baseX; x < baseX + 12; x += 3) {
+        grid[H-5][x] = 'b';
+        grid[H-4][x+1] = (Math.random() < 0.4) ? 'g' : 'A';
+        grid[H-4][x+2] = 'w';
+      }
+      grid[H-7][baseX+5] = 'c';
+    } else if (pattern === 5) {
+      for (let x = baseX; x < baseX + 12; x++) {
+        grid[H-2][x] = (x % 5 === 0) ? 'B' : 'b';
+      }
+      grid[H-3][baseX+4] = 's';
+      grid[H-6][baseX+8] = 'c';
+    } else {
+      for (let x = baseX; x < baseX + 14; x++) {
+        if (Math.random() < 0.12) grid[H-3][x] = 'c';
+        if (Math.random() < 0.06) grid[H-2][x] = '^';
+        if (grid[H-2][x] !== '^') grid[H-2][x] = 'b';
+      }
+    }
+  }
+
+  // sprinkle coins and small platforms across the map
+  for (let x = 8; x < W - 8; x += 7) {
+    const y = 2 + ((x * 5) % (H - 6));
+    if (grid[y][x] === 'A') grid[y][x] = 'c';
+    if (Math.random() < 0.12) grid[y+1][x+2] = 'h';
+  }
+
+  // moving platforms
+  for (let i = 0; i < Math.floor(W / 40); i++) {
+    const x = 20 + i * 37 + (i % 3);
+    const y = H - 6 - (i % 4);
+    if (x < W-2) grid[y][x] = (i % 2 === 0) ? 'v' : 'h';
+    if (Math.random() < 0.5) grid[y-2][x+2] = 'c';
+  }
+
+  // place goal near far right
+  const goalX = W - 6;
+  const goalY = H - 4;
+  grid[goalY][goalX] = 'G';
+  grid[goalY+1][goalX-2] = 'b';
+  grid[goalY+1][goalX-4] = 'g';
+  grid[goalY-2][goalX-6] = 'c';
+
+  // ensure start exists near left
+  let foundStart = false;
+  for (let r = 0; r < H; r++) for (let c = 0; c < W; c++) if (grid[r][c] === '#') foundStart = true;
+  if (!foundStart) grid[H-3][2] = '#';
+
+  // final pass: fill any empty ground holes with blocks (but keep some ghost background patches)
+  for (let x = 0; x < W; x++) {
+    if (grid[H-1][x] === 'A') grid[H-1][x] = (Math.random() < 0.18) ? 'g' : 'b';
+  }
+
+  return grid.map(row => row.join('')).join('\n');
+}
+
+/* UI & LEVEL FLOW */
+function populateLevels(){
+  levelSelect.innerHTML = '';
+  BUILT_LEVELS.forEach((lvl, i) => {
+    const opt = document.createElement('option');
+    opt.value = String(i);
+    opt.textContent = `${i+1}: ${lvl.name}`;
+    levelSelect.appendChild(opt);
+  });
+}
+
+function loadFromInput(){
+  try{
+    const { world: w, player: p } = buildWorld(mapInput.value);
+    world = w; player = p;
+    camera.x = player.x; camera.y = player.y;
+    validateMsg.textContent = 'Loaded successfully.'; validateMsg.className = 'okmsg';
+    deathOverlay.classList.remove('show'); deathOverlay.setAttribute('aria-hidden','true');
+    winOverlay.classList.remove('show'); winOverlay.setAttribute('aria-hidden','true');
+    paused = false;
+    if(autoNextTimer){ clearTimeout(autoNextTimer); autoNextTimer = null; }
+  } catch(err){
+    validateMsg.textContent = String(err.message || err); validateMsg.className = 'error';
+  }
+}
+function validateMap(){ try{ parseMap(mapInput.value); validateMsg.textContent = 'Map is valid.'; validateMsg.className = 'okmsg'; } catch(err){ validateMsg.textContent = String(err.message || err); validateMsg.className = 'error'; } }
+function restartLevel(){ const lvl = BUILT_LEVELS[currentLevelIndex]; mapInput.value = lvl.map; loadFromInput(); }
+function togglePause(){ paused = !paused; pauseBtn.textContent = paused ? 'Resume' : 'Pause'; showToast(paused ? 'Paused' : 'Resumed'); }
+function loadLevelIndex(i){ const lvl = BUILT_LEVELS[i]; if(!lvl) return; currentLevelIndex = i; mapInput.value = lvl.map; loadFromInput(); }
+function nextLevel(){ if(autoNextTimer){ clearTimeout(autoNextTimer); autoNextTimer = null; } winOverlay.classList.remove('show'); winOverlay.setAttribute('aria-hidden','true'); if(currentLevelIndex < BUILT_LEVELS.length - 1){ currentLevelIndex++; loadLevelIndex(currentLevelIndex); levelSelect.value = String(currentLevelIndex); showToast(`Level ${currentLevelIndex+1}`); } else { showToast('All levels complete! 🎉'); restartLevel(); } }
+function showHelp(){ alert(`Tiles:\nA air, b block, B breakable brick, g ghost background room (non-solid),\nc coin, ^ spike, s spring, h horizontal platform, v vertical platform,\nw one-way floor, G goal, # player start.\n\nNotes:\n- Ghost 'g' now fills rectangular rooms (background) rather than scattered tiles.\n- Ghost rooms are non-solid and drawn behind everything.\n- Every '#' will be guaranteed a block beneath it on load.\n\nControls:\nLeft/Right to move, Up to jump, R restart, P pause, Enter restart/next.`); }
+
+/* BOOT */
+function boot(){
+  const bigMap = generateUniqueMap(300, 15);
+  BUILT_LEVELS[0].map = bigMap;
+  populateLevels();
+  levelSelect.value = '0';
+  currentLevelIndex = 0;
+  mapInput.value = BUILT_LEVELS[0].map;
+  loadFromInput();
+  requestAnimationFrame(frame);
+  overlayRestartBtn.addEventListener('click', restartLevel);
+  overlayNextBtn.addEventListener('click', nextLevel);
+}
+levelSelect.addEventListener('change', () => loadLevelIndex(Number(levelSelect.value)));
+loadBtn.addEventListener('click', loadFromInput);
+validateBtn.addEventListener('click', validateMap);
+restartBtn.addEventListener('click', restartLevel);
+pauseBtn.addEventListener('click', togglePause);
+helpBtn.addEventListener('click', showHelp);
+
+boot();
+</script>
+</body>
+</html>
