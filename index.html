@@ -2,141 +2,125 @@
 <html lang="en">
 <head>
 <meta charset="utf-8" />
-<title>Map Editor + Launcher — Drag & Paint to Text Map</title>
+<title>Map Editor — Play Launcher</title>
 <meta name="viewport" content="width=device-width,initial-scale=1" />
 <style>
   :root{
-    --bg:#0f1220; --panel:#161826; --muted:#9aa0b4; --accent:#58c4ff; --ok:#77dd77;
-    --tile-size:28px;
+    --bg:#0f1220; --panel:#0b0f1a; --muted:#9aa0b4; --accent:#58c4ff;
+    --tile-size:32px;
   }
   html,body{height:100%;margin:0;font-family:Inter,system-ui,Segoe UI,Roboto,Arial;background:var(--bg);color:#e8eef8}
-  .app{display:grid;grid-template-columns:260px 1fr;grid-template-rows:auto 1fr;gap:12px;padding:12px;height:100%;box-sizing:border-box}
+  .app{display:grid;grid-template-columns:360px 1fr;gap:12px;padding:12px;height:100%;box-sizing:border-box}
   header{grid-column:1/-1;display:flex;align-items:center;gap:12px}
   h1{font-size:16px;margin:0}
-  .menu{margin-left:auto;display:flex;gap:8px}
-  button{background:var(--panel);color:var(--muted);border:1px solid #22263a;padding:8px 10px;border-radius:8px;cursor:pointer}
-  button.primary{background:var(--accent);color:#071022;border-color:#66d3ff;font-weight:600}
-  .panel{background:#0b0f1a;border:1px solid #22263a;border-radius:10px;padding:12px;display:flex;flex-direction:column;gap:10px;min-height:0}
+  .panel{background:var(--panel);border-radius:10px;padding:12px;box-sizing:border-box}
   .left{display:flex;flex-direction:column;gap:12px}
   .palette{display:flex;flex-wrap:wrap;gap:8px}
-  .sw{width:44px;height:36px;border-radius:8px;display:grid;place-items:center;cursor:pointer;border:1px solid #0004}
+  .sw{width:56px;height:44px;border-radius:8px;display:grid;place-items:center;cursor:pointer;border:1px solid #0004}
   .sw.active{outline:3px solid #66d3ff33}
   .sw code{font-family:monospace;color:#fff}
-  .editor-wrap{display:flex;flex-direction:column;gap:8px}
+  .controls{display:flex;gap:8px;align-items:center;flex-wrap:wrap}
   .grid-wrap{background:#071022;border-radius:8px;padding:8px;overflow:auto}
-  .grid{display:grid;grid-auto-rows:var(--tile-size);grid-auto-columns:var(--tile-size);gap:2px;touch-action:none}
-  .cell{width:var(--tile-size);height:var(--tile-size);background:transparent;border-radius:4px;box-sizing:border-box;border:1px solid #0000;cursor:crosshair}
-  .cell[data-t="b"]{background:#7a4f2d}
-  .cell[data-t="B"]{background:#9b5e34}
-  .cell[data-t="g"]{background:#4a3a2a}
-  .cell[data-t="c"]{background:#ffd24d}
-  .cell[data-t="^"]{background:#c33}
-  .cell[data-t="s"]{background:#66ddff}
-  .cell[data-t="h"], .cell[data-t="v"]{background:#7a6fff}
-  .cell[data-t="G"]{background:#5fd866}
-  .cell[data-t="#"]{outline:2px solid #fff4}
-  .controls{display:flex;gap:8px;flex-wrap:wrap}
+  .grid{display:grid;gap:2px;touch-action:none}
+  .cell{width:var(--tile-size);height:var(--tile-size);border-radius:4px;box-sizing:border-box;border:1px solid transparent;cursor:crosshair;display:flex;align-items:center;justify-content:center}
+  .cell[data-t="A"]{background:linear-gradient(#071022,#071022); border:1px dashed #0006;}
+  .cell[data-t="b"]{background:#7a4f2d; box-shadow:inset 0 -6px 0 #6a3f1d;}
+  .cell[data-t="B"]{background:#9b5e34; box-shadow:inset 0 -6px 0 #7a4f2d;}
+  .cell[data-t="g"]{background:#4a3a2a; opacity:0.95;}
+  .cell[data-t="c"]{background:linear-gradient(#ffd24d,#ffcf4a); border-radius:6px;}
+  .cell[data-t="^"]{background:linear-gradient(#c33,#a22); clip-path:polygon(50% 10%, 90% 90%, 10% 90%);}
+  .cell[data-t="s"]{background:#66ddff; box-shadow:inset 0 -4px 0 #3fb8e6; border-radius:6px;}
+  .cell[data-t="h"], .cell[data-t="v"]{background:#7a6fff; box-shadow:inset 0 -6px 0 #5a4fff;}
+  .cell[data-t="w"]{background:transparent; border-top:3px solid #333; border-radius:0;}
+  .cell[data-t="G"]{background:#5fd866; box-shadow:inset 0 -6px 0 #3fa84a; border-radius:6px;}
+  .cell[data-t="#"]{outline:2px solid #fff4; background:linear-gradient(#111,#222);}
+
+  .right{display:flex;flex-direction:column;gap:12px}
+  .game-preview{background:#071022;border-radius:8px;padding:12px;min-height:420px;display:flex;flex-direction:column;gap:8px}
   textarea#mapText{width:100%;height:160px;background:#071022;color:#e8eef8;border:1px solid #22263a;padding:8px;border-radius:8px;font-family:monospace;resize:vertical}
-  .right{display:grid;grid-template-rows:auto 1fr;gap:12px}
-  .game-area{background:#071022;border-radius:8px;padding:8px;display:flex;flex-direction:column;gap:8px}
-  canvas{background:linear-gradient(#88c6ff,#bde9ff);border-radius:8px;border:1px solid #22263a;display:block;width:100%;height:520px}
-  .note{color:var(--muted);font-size:13px}
+  button{background:#0f1724;color:#e8eef8;border:1px solid #22263a;padding:8px 10px;border-radius:8px;cursor:pointer}
+  button.primary{background:var(--accent);color:#071022;border-color:#66d3ff;font-weight:600}
+  .small{color:var(--muted);font-size:13px}
   .row{display:flex;gap:8px;align-items:center}
-  .small{font-size:13px;color:var(--muted)}
-  .footer{grid-column:1/-1;display:flex;justify-content:space-between;align-items:center;padding:8px 12px;color:var(--muted);font-size:13px}
-  .kbd{background:#0b1220;border:1px solid #22263a;padding:4px 8px;border-radius:6px;color:#cfe8ff;font-size:12px}
+  .footer{grid-column:1/-1;color:var(--muted);font-size:13px;padding-top:6px}
 </style>
 </head>
 <body>
 <div class="app">
   <header>
-    <h1>Map Editor & Launcher</h1>
-    <div class="menu">
-      <button id="btnEditor" class="primary">Editor</button>
-      <button id="btnPlay">Play</button>
-      <button id="btnLoadSample">Load Sample</button>
-    </div>
+    <h1>Map Editor — Play Launcher</h1>
+    <div style="margin-left:auto" class="small">Click Play to open <code>playplatform.html</code> with the current map</div>
   </header>
 
-  <!-- LEFT: Editor controls -->
-  <div class="left panel" id="editorPanel">
+  <!-- LEFT: Editor -->
+  <div class="panel left">
     <div class="row">
       <strong>Palette</strong>
-      <div style="margin-left:auto" class="small">Drag or click to paint</div>
+      <div style="margin-left:auto" class="small">Click to select, drag to paint</div>
     </div>
 
-    <div class="palette" id="palette">
-      <!-- palette items inserted by JS -->
+    <div class="palette" id="palette"></div>
+
+    <div class="row controls">
+      <label class="small">Cols <input id="cols" type="number" value="60" min="10" max="400" style="width:70px;margin-left:6px"></label>
+      <label class="small">Rows <input id="rows" type="number" value="15" min="6" max="60" style="width:70px;margin-left:6px"></label>
+      <button id="resizeBtn">Resize</button>
+      <button id="clearBtn">Clear (all Air)</button>
     </div>
 
-    <div class="editor-wrap">
-      <div class="row">
-        <label class="small">Cols <input id="cols" type="number" value="60" min="10" max="400" style="width:70px;margin-left:6px"></label>
-        <label class="small">Rows <input id="rows" type="number" value="15" min="6" max="60" style="width:70px;margin-left:6px"></label>
-        <button id="resizeBtn">Resize</button>
-        <button id="fillAir">Clear</button>
-      </div>
-
-      <div class="grid-wrap" id="gridWrap" style="height:360px">
-        <div id="grid" class="grid"></div>
-      </div>
-
-      <div class="controls">
-        <button id="exportBtn">Export to Text</button>
-        <button id="copyBtn">Copy Text</button>
-        <button id="loadToGame">Load into Game</button>
-        <button id="autoSupport">Ensure Spawn Support</button>
-      </div>
-
-      <div>
-        <div class="small">Map text (editable)</div>
-        <textarea id="mapText" spellcheck="false"></textarea>
-      </div>
+    <div class="grid-wrap" id="gridWrap" style="height:420px">
+      <div id="grid" class="grid" tabindex="0" aria-label="Map editor play space"></div>
     </div>
+
+    <div class="row">
+      <button id="exportBtn">Export to Text</button>
+      <button id="copyBtn">Copy Text</button>
+      <button id="loadToGame">Load into Game Text</button>
+      <button id="ensureSupport">Ensure Spawn Support</button>
+    </div>
+
+    <div class="small">Tip: Right-click a cell to erase it to Air. Start (#) and Goal (G) are available in the palette.</div>
   </div>
 
-  <!-- RIGHT: Game area -->
+  <!-- RIGHT: Preview & Text -->
   <div class="right">
-    <div class="panel game-area" id="gamePanel">
+    <div class="panel game-preview">
       <div style="display:flex;justify-content:space-between;align-items:center">
-        <strong>Game</strong>
-        <div class="row">
-          <div class="small">Controls: ← → jump ↑ · R restart · P pause</div>
-        </div>
+        <strong>Play Space Preview</strong>
+        <div class="small">This grid is the play area — it looks like the in-game tiles</div>
       </div>
-      <canvas id="gameCanvas" width="1280" height="520"></canvas>
-      <div style="display:flex;gap:8px">
-        <button id="startGame" class="primary">Start</button>
-        <button id="restartGame">Restart</button>
+
+      <div style="flex:1;display:flex;align-items:center;justify-content:center">
+        <canvas id="previewCanvas" width="960" height="320" style="border-radius:8px;background:#071022"></canvas>
+      </div>
+
+      <div class="row">
+        <button id="btnPlay" class="primary">Play (open playplatform.html)</button>
+        <button id="startGame">Start (preview)</button>
         <button id="pauseGame">Pause</button>
-        <div style="margin-left:auto" class="note" id="status">No map loaded</div>
+        <div style="margin-left:auto" id="status" class="small">No map loaded</div>
       </div>
     </div>
 
     <div class="panel">
-      <div class="small">Quick actions</div>
+      <div class="small">Map text (editable)</div>
+      <textarea id="mapText" spellcheck="false"></textarea>
       <div style="display:flex;gap:8px;margin-top:8px">
-        <button id="placeStart">Place Start (#)</button>
-        <button id="placeGoal">Place Goal (G)</button>
-        <button id="eraseBtn">Eraser</button>
+        <button id="loadFromText">Load into Editor</button>
+        <button id="loadSample">Load Sample</button>
       </div>
-      <div style="margin-top:10px" class="note">Tip: click a palette tile then drag across the grid to paint. Right-click to erase a cell.</div>
     </div>
   </div>
 
-  <div class="footer">
-    <div>Editor & Game — drag to paint maps, export to the text format used by the game.</div>
-    <div>Made for you</div>
-  </div>
+  <div class="footer">Editor play space = game tiles. All cells default to Air until painted.</div>
 </div>
 
 <script>
-/* =========================
-   Editor + Launcher Script
-   - Drag/paint editor that exports to text map
-   - Simple menu to switch Editor / Play (shows/hides panels)
-   - Loads map into the game engine below
-   ========================= */
+/* Editor + Play launcher
+   - When Play is clicked: current map text is saved to localStorage under key "playplatform_map"
+     then playplatform.html is opened in a new tab/window. playplatform.html can read that key.
+   - Editor grid defaults to Air ('A') until painted.
+*/
 
 const PALETTE = [
   {k:'A', label:'Air', color:'#071022'},
@@ -154,22 +138,22 @@ const PALETTE = [
 ];
 
 const gridEl = document.getElementById('grid');
-const gridWrap = document.getElementById('gridWrap');
 const paletteEl = document.getElementById('palette');
 const mapText = document.getElementById('mapText');
 const colsInput = document.getElementById('cols');
 const rowsInput = document.getElementById('rows');
+const resizeBtn = document.getElementById('resizeBtn');
+const clearBtn = document.getElementById('clearBtn');
 const exportBtn = document.getElementById('exportBtn');
 const copyBtn = document.getElementById('copyBtn');
-const loadToGameBtn = document.getElementById('loadToGame');
-const autoSupportBtn = document.getElementById('autoSupport');
-const resizeBtn = document.getElementById('resizeBtn');
-const fillAirBtn = document.getElementById('fillAir');
-const btnEditor = document.getElementById('btnEditor');
+const loadToGame = document.getElementById('loadToGame');
+const ensureSupport = document.getElementById('ensureSupport');
+const loadFromText = document.getElementById('loadFromText');
+const loadSample = document.getElementById('loadSample');
+const previewCanvas = document.getElementById('previewCanvas');
+const previewCtx = previewCanvas.getContext('2d');
 const btnPlay = document.getElementById('btnPlay');
-const editorPanel = document.getElementById('editorPanel');
-const gamePanel = document.getElementById('gamePanel');
-const btnLoadSample = document.getElementById('btnLoadSample');
+const statusEl = document.getElementById('status');
 
 let COLS = parseInt(colsInput.value,10);
 let ROWS = parseInt(rowsInput.value,10);
@@ -178,7 +162,7 @@ let isPainting = false;
 let isErasing = false;
 let gridData = []; // 2D array of chars
 
-/* build palette */
+/* build palette UI */
 PALETTE.forEach(p=>{
   const d = document.createElement('div');
   d.className='sw';
@@ -186,7 +170,7 @@ PALETTE.forEach(p=>{
   d.dataset.k = p.k;
   d.style.background = p.color;
   d.innerHTML = `<code>${p.k}</code>`;
-  d.addEventListener('click', ()=>{ selectTool(p.k); });
+  d.addEventListener('click', ()=> selectTool(p.k));
   paletteEl.appendChild(d);
 });
 function selectTool(k){
@@ -195,7 +179,7 @@ function selectTool(k){
 }
 selectTool('b');
 
-/* create grid */
+/* create grid (all Air by default) */
 function makeGrid(cols, rows){
   COLS = cols; ROWS = rows;
   gridEl.innerHTML = '';
@@ -208,12 +192,15 @@ function makeGrid(cols, rows){
       cell.dataset.r = r; cell.dataset.c = c; cell.dataset.t = 'A';
       cell.addEventListener('pointerdown', onPointerDown);
       cell.addEventListener('pointerenter', onPointerEnter);
-      cell.addEventListener('contextmenu', e=>{ e.preventDefault(); eraseCell(cell); });
+      cell.addEventListener('contextmenu', e=>{ e.preventDefault(); eraseCell(cell); updateMapText(); renderPreview(); });
       gridEl.appendChild(cell);
     }
   }
   updateMapText();
+  renderPreview();
 }
+
+/* set/erase cell */
 function setCell(cell, t){
   cell.dataset.t = t;
   gridData[+cell.dataset.r][+cell.dataset.c] = t;
@@ -222,20 +209,24 @@ function setCell(cell, t){
 function eraseCell(cell){
   setCell(cell,'A');
 }
+
+/* pointer handlers */
 function onPointerDown(e){
   e.preventDefault();
   const cell = e.currentTarget;
   isPainting = true;
-  isErasing = (e.button === 2) || currentTool==='A' || currentTool==='erase';
+  isErasing = (e.button === 2) || currentTool === 'A';
   if(isErasing) eraseCell(cell);
   else setCell(cell, currentTool);
   window.addEventListener('pointerup', onPointerUp);
+  renderPreview();
 }
 function onPointerEnter(e){
   if(!isPainting) return;
   const cell = e.currentTarget;
   if(isErasing) eraseCell(cell);
   else setCell(cell, currentTool);
+  renderPreview();
 }
 function onPointerUp(e){
   isPainting = false;
@@ -244,65 +235,55 @@ function onPointerUp(e){
   window.removeEventListener('pointerup', onPointerUp);
 }
 
-/* editor controls */
+/* controls */
 resizeBtn.addEventListener('click', ()=>{
   const nc = Math.max(10, Math.min(400, parseInt(colsInput.value,10)||60));
   const nr = Math.max(6, Math.min(60, parseInt(rowsInput.value,10)||15));
-  // preserve existing content as much as possible
   const old = gridData;
   makeGrid(nc,nr);
   for(let r=0;r<Math.min(nr,old.length);r++){
     for(let c=0;c<Math.min(nc,old[0].length);c++){
       gridData[r][c] = old[r][c];
-      const idx = r*nc + c;
       const cell = gridEl.children[r*nc + c];
       if(cell) cell.dataset.t = old[r][c];
     }
   }
   updateMapText();
+  renderPreview();
 });
-fillAirBtn.addEventListener('click', ()=>{ for(let r=0;r<ROWS;r++) for(let c=0;c<COLS;c++){ gridData[r][c]='A'; const cell = gridEl.children[r*COLS+c]; if(cell) cell.dataset.t='A'; } updateMapText(); });
+clearBtn.addEventListener('click', ()=>{ for(let r=0;r<ROWS;r++) for(let c=0;c<COLS;c++){ gridData[r][c]='A'; const cell = gridEl.children[r*COLS+c]; if(cell) cell.dataset.t='A'; } updateMapText(); renderPreview(); });
 
-exportBtn.addEventListener('click', ()=>{ updateMapText(); alert('Map text updated below. Use Copy to copy it.'); });
-copyBtn.addEventListener('click', ()=>{ mapText.select(); document.execCommand('copy'); showStatus('Copied map text'); });
+exportBtn.addEventListener('click', ()=>{ updateMapText(); alert('Map text updated below.'); });
+copyBtn.addEventListener('click', ()=>{ mapText.select(); document.execCommand('copy'); status('Copied map text'); });
 
 function updateMapText(){
-  // join rows into strings; trim trailing A's per row? keep fixed width for game
   const rows = gridData.map(r=>r.join(''));
   mapText.value = rows.join('\n');
-  showStatus('Map text updated');
 }
 
-/* quick place start/goal/eraser */
-document.getElementById('placeStart').addEventListener('click', ()=> selectTool('#'));
-document.getElementById('placeGoal').addEventListener('click', ()=> selectTool('G'));
-document.getElementById('eraseBtn').addEventListener('click', ()=> selectTool('A'));
-
-/* ensure spawn support: guarantee a 'b' under every '#' */
-autoSupportBtn.addEventListener('click', ()=>{
+/* ensure spawn support: put 'b' under every '#' */
+ensureSupport.addEventListener('click', ()=>{
   for(let r=0;r<ROWS;r++){
     for(let c=0;c<COLS;c++){
       if(gridData[r][c]==='#'){
         if(r >= ROWS-1){
-          // move start up one if bottom
           gridData[r][c] = 'b';
           gridData[Math.max(0,ROWS-2)][c] = '#';
         } else {
-          if(gridData[r+1][c] === 'A' || gridData[r+1][c] === 'g' || gridData[r+1][c] === 'c' || gridData[r+1][c] === 'w'){
-            gridData[r+1][c] = 'b';
-          }
+          const below = gridData[r+1][c];
+          if(!below || below==='A' || below==='g' || below==='c' || below==='w') gridData[r+1][c] = 'b';
         }
       }
     }
   }
-  // update DOM
   for(let r=0;r<ROWS;r++) for(let c=0;c<COLS;c++){ const cell = gridEl.children[r*COLS+c]; if(cell) cell.dataset.t = gridData[r][c]; }
   updateMapText();
-  showStatus('Spawn support ensured');
+  renderPreview();
+  status('Spawn support ensured');
 });
 
-/* load map text into editor */
-mapText.addEventListener('change', ()=>{
+/* load from text into editor */
+loadFromText.addEventListener('click', ()=>{
   const rows = mapText.value.replace(/\r/g,'').split('\n');
   const w = Math.max(...rows.map(r=>r.length));
   const h = rows.length;
@@ -316,361 +297,112 @@ mapText.addEventListener('change', ()=>{
       if(cell) cell.dataset.t = ch;
     }
   }
+  updateMapText();
+  renderPreview();
+  status('Loaded map into editor');
 });
 
-/* load sample map */
-btnLoadSample.addEventListener('click', ()=>{
+/* sample map */
+loadSample.addEventListener('click', ()=>{
   const sample = generateSampleMap(120,15);
   mapText.value = sample;
-  mapText.dispatchEvent(new Event('change'));
-  showStatus('Sample map loaded');
+  loadFromText.click();
 });
 
 /* initial grid */
 makeGrid(COLS, ROWS);
 
-/* =========================
-   Simple Game Engine (adapted)
-   - Loads map text from editor
-   - Ensures spawn support on load
-   - Basic physics, collisions, coins, spikes, goal
-   ========================= */
-
-const canvas = document.getElementById('gameCanvas');
-const ctx = canvas.getContext('2d');
-const startGameBtn = document.getElementById('startGame');
-const restartGameBtn = document.getElementById('restartGame');
-const pauseGameBtn = document.getElementById('pauseGame');
-const statusEl = document.getElementById('status');
-
-let world = null, player = null, camera = {x:0,y:0}, keys = new Set(), paused = true, lastTime = performance.now(), autoNext=null;
-
-/* physics constants */
-const TILE = 32, GRAVITY = 1800, MOVE_ACCEL = 8000, MOVE_MAX = 240, JUMP_VEL = 640, SPRING_VEL = 860, COYOTE = 0.12, JUMP_BUF = 0.12, MAX_STEPS = 5, CAMERA_LERP = 0.16;
-
-/* parse map text into world */
-function parseMapText(text){
-  const rows = text.replace(/\r/g,'').split('\n').map(r=>r.replace(/\s+$/,''));
-  const height = rows.length;
-  const width = Math.max(...rows.map(r=>r.length));
-  const tiles = Array.from({length:height}, (_,r)=>Array.from({length:width}, (_,c)=> (rows[r][c]||'A') ));
-  return {tiles,width,height};
-}
-
-/* ensure spawn support (applied before creating player) */
-function ensureSpawnSupport(world){
-  const H = world.height, W = world.width;
-  for(let r=0;r<H;r++){
-    for(let c=0;c<W;c++){
-      if(world.tiles[r][c]==='#'){
-        if(r >= H-1){
-          world.tiles[r][c] = 'b';
-          world.tiles[Math.max(0,H-2)][c] = '#';
-        } else {
-          const below = world.tiles[r+1][c];
-          if(!below || below==='A' || below==='g' || below==='c' || below==='w') world.tiles[r+1][c] = 'b';
-        }
-      }
+/* preview rendering */
+function renderPreview(){
+  const ctx = previewCtx;
+  const W = previewCanvas.width, H = previewCanvas.height;
+  ctx.clearRect(0,0,W,H);
+  const cellW = Math.floor(W / COLS);
+  const cellH = Math.floor(H / ROWS);
+  const s = Math.max(4, Math.min(cellW, cellH));
+  const offsetX = Math.floor((W - s*COLS)/2);
+  const offsetY = Math.floor((H - s*ROWS)/2);
+  for(let r=0;r<ROWS;r++){
+    for(let c=0;c<COLS;c++){
+      const t = gridData[r][c];
+      const x = offsetX + c*s, y = offsetY + r*s;
+      drawTilePreview(ctx, t, x, y, s, s);
     }
   }
 }
-
-/* build world object */
-function buildWorldFromText(text){
-  const parsed = parseMapText(text);
-  const w = { tiles: parsed.tiles, width: parsed.width, height: parsed.height, coins: new Set(), spikes: new Set(), moving: [], goals: new Set() };
-  ensureSpawnSupport(w);
-  let start = null;
-  for(let r=0;r<w.height;r++){
-    for(let c=0;c<w.width;c++){
-      const t = w.tiles[r][c];
-      const id = r+','+c;
-      if(t==='c') w.coins.add(id);
-      if(t==='^') w.spikes.add(id);
-      if(t==='h'||t==='v') w.moving.push({c,r,type:t,tAccum:0,offsetX:0,offsetY:0,prevX:0,prevY:0});
-      if(t==='G') w.goals.add(id);
-      if(t==='#' && !start) start = {c,r};
-    }
-  }
-  if(!start) start = {c:2,r:2};
-  const p = { x:start.c*TILE, y:start.r*TILE, w:TILE*0.8, h:TILE*0.95, vx:0, vy:0, onGround:false, coyote:0, jumpBuffer:0, coins:0, alive:true, win:false, carriedBy:null };
-  return {world:w, player:p};
-}
-
-/* collisions */
-function rectsOverlap(a,b){ return !(a.x+a.w<=b.x||b.x+b.w<=a.x||a.y+a.h<=b.y||b.y+b.h<=a.y); }
-function tileRect(c,r){ return {x:c*TILE,y:r*TILE,w:TILE,h:TILE}; }
-function isSolid(t){ return t==='b'||t==='B'||t==='h'||t==='v'; }
-function isOneWay(t){ return t==='w'; }
-
-function collide(world, rect, dx, dy){
-  let resolvedX = dx, resolvedY = dy;
-  rect.x += resolvedX;
-  forEachTile(rect, (c,r,t)=>{
-    if(!t) return;
-    if(isSolid(t)){
-      const tr = getTileRect(world,c,r,t);
-      if(rectsOverlap(rect,tr)){
-        if(resolvedX>0) rect.x = tr.x - rect.w;
-        else if(resolvedX<0) rect.x = tr.x + tr.w;
-        resolvedX = 0;
-      }
-    }
-  }, world);
-  rect.y += resolvedY;
-  let hitY = null;
-  forEachTile(rect, (c,r,t)=>{
-    if(!t) return;
-    const tr = getTileRect(world,c,r,t);
-    if(isSolid(t) || isOneWay(t)){
-      if(!rectsOverlap(rect,tr)) return;
-      if(isOneWay(t)){
-        const prevBottom = rect.y - resolvedY + rect.h;
-        const top = tr.y;
-        const crossingDown = (resolvedY>0) && (prevBottom<=top) && (rect.y+rect.h>=top);
-        if(!crossingDown) return;
-      }
-      if(resolvedY>0){ rect.y = tr.y - rect.h; hitY={c,r,t,side:'bottom'}; }
-      else if(resolvedY<0){ rect.y = tr.y + tr.h; hitY={c,r,t,side:'top'}; }
-      resolvedY = 0;
-    }
-  }, world);
-  return {dx:resolvedX, dy:resolvedY, hitY};
-}
-function forEachTile(rect, cb, world){
-  const c0 = Math.floor(rect.x/TILE), c1 = Math.floor((rect.x+rect.w-1)/TILE);
-  const r0 = Math.floor(rect.y/TILE), r1 = Math.floor((rect.y+rect.h-1)/TILE);
-  for(let r=r0;r<=r1;r++) for(let c=c0;c<=c1;c++) cb(c,r, world.tiles[r] ? world.tiles[r][c] : undefined);
-}
-function getTileRect(world,c,r,t){
-  if(t==='h'||t==='v'){
-    const mp = world.moving.find(m=>m.c===c&&m.r===r);
-    const base = tileRect(c,r);
-    if(!mp) return base;
-    return {x:base.x+(mp.offsetX||0), y:base.y+(mp.offsetY||0), w:base.w, h:base.h};
-  }
-  return tileRect(c,r);
-}
-
-/* update moving platforms */
-function updateMoving(world, dt){
-  for(const m of world.moving){
-    m.tAccum += dt;
-    const span = 3*TILE;
-    const phase = Math.sin(m.tAccum * (80 / span)) * span;
-    m.prevX = m.offsetX || 0; m.prevY = m.offsetY || 0;
-    if(m.type==='h'){ m.offsetX = phase; m.offsetY = 0; } else { m.offsetX = 0; m.offsetY = phase; }
-  }
-}
-
-/* apply moving platform carry */
-function applyCarry(player, world){
-  player.carriedBy = null;
-  const feet = {x:player.x, y:player.y+player.h, w:player.w, h:2};
-  const c0 = Math.floor(feet.x/TILE), c1 = Math.floor((feet.x+feet.w-1)/TILE);
-  const r0 = Math.floor(feet.y/TILE), r1 = Math.floor((feet.y+feet.h-1)/TILE);
-  for(let r=r0;r<=r1;r++) for(let c=c0;c<=c1;c++){
-    const t = world.tiles[r] ? world.tiles[r][c] : undefined;
-    if(t==='h'||t==='v'){
-      const tr = getTileRect(world,c,r,t);
-      if(rectsOverlap(feet,tr) || Math.abs(tr.y - (player.y+player.h))<=2) player.carriedBy = world.moving.find(m=>m.c===c&&m.r===r);
-    }
-  }
-  if(player.carriedBy && player.onGround){
-    player.x += (player.carriedBy.offsetX - (player.carriedBy.prevX||0));
-    player.y += (player.carriedBy.offsetY - (player.carriedBy.prevY||0));
-  }
-}
-
-/* update player */
-function updatePlayer(dt){
-  if(!player || !world) return;
-  const left = keys.has('ArrowLeft'), right = keys.has('ArrowRight'), up = keys.has('ArrowUp');
-  const accel = player.onGround ? MOVE_ACCEL : MOVE_ACCEL*0.35;
-  if(left && !right) player.vx -= accel*dt;
-  else if(right && !left) player.vx += accel*dt;
-  else if(player.onGround) player.vx *= 0.86;
-  player.vx = Math.max(-MOVE_MAX, Math.min(MOVE_MAX, player.vx));
-  if(up) player.jumpBuffer = JUMP_BUF; else player.jumpBuffer = Math.max(0, player.jumpBuffer - dt);
-  player.vy += GRAVITY*dt; player.vy = Math.min(player.vy, 1500);
-
-  let px = player.x, py = player.y, vx = player.vx, vy = player.vy;
-  let grounded = false;
-  const steps = MAX_STEPS;
-  for(let i=0;i<steps;i++){
-    const sub = dt/steps, dx = vx*sub, dy = vy*sub;
-    const rect = {x:px,y:py,w:player.w,h:player.h};
-    const res = collide(world, rect, dx, dy);
-    if(res.hitY && res.hitY.side==='bottom') grounded = true;
-    // breakable bricks
-    if(res.hitY && res.hitY.side==='top' && res.hitY.t==='B'){ world.tiles[res.hitY.r][res.hitY.c] = 'A'; }
-    // coins
-    forEachTile(rect, (c,r,t)=>{ if(t==='c'){ world.tiles[r][c]='A'; player.coins++; } }, world);
-    // spikes
-    let sp=false; forEachTile(rect,(c,r,t)=>{ if(t==='^') sp=true; }, world);
-    if(sp){ player.alive=false; paused=true; statusEl.textContent='You died'; break; }
-    // springs
-    if(res.hitY && res.hitY.side==='bottom'){ const t = world.tiles[res.hitY.r][res.hitY.c]; if(t==='s') vy = -SPRING_VEL; }
-    // goal
-    let reached=false; forEachTile(rect,(c,r,t)=>{ if(t==='G') reached=true; }, world);
-    if(reached){ player.win=true; paused=true; statusEl.textContent='You win!'; break; }
-
-    px = rect.x; py = rect.y; vx = res.dx/(sub||1e-9); vy = res.dy/(sub||1e-9);
-  }
-  player.x = px; player.y = py; player.vx = vx; player.vy = vy;
-  if(grounded){ if(!player.onGround) player.coyote = COYOTE; player.onGround = true; player.vy = Math.max(player.vy,0); } else { player.onGround=false; player.coyote = Math.max(0, player.coyote - dt); }
-  if(player.jumpBuffer>0 && (player.onGround || player.coyote>0)){ player.vy = -JUMP_VEL; player.onGround=false; player.coyote=0; player.jumpBuffer=0; }
-  applyCarry(player, world);
-  if(player.y > world.height*TILE + 200){ player.alive=false; paused=true; statusEl.textContent='You died'; }
-}
-
-/* render */
-function draw(){
-  if(!world || !player) { ctx.clearRect(0,0,canvas.width,canvas.height); return; }
-  const vw = canvas.width, vh = canvas.height;
-  const tx = player.x + player.w/2, ty = player.y + player.h/2;
-  camera.x += (tx - camera.x)*CAMERA_LERP; camera.y += (ty - camera.y)*CAMERA_LERP;
-  const cx = Math.floor(camera.x - vw/2), cy = Math.floor(camera.y - vh/2);
-
-  // background
-  ctx.fillStyle = '#88c6ff'; ctx.fillRect(0,0,vw,vh);
-
-  // draw ghost background first
-  for(let r=0;r<world.height;r++){
-    for(let c=0;c<world.width;c++){
-      if(world.tiles[r][c]==='g'){
-        const x = c*TILE - cx, y = r*TILE - cy;
-        ctx.fillStyle = '#4a3a2a'; ctx.fillRect(x,y,TILE,TILE);
-      }
-    }
-  }
-
-  // draw tiles
-  for(let r=0;r<world.height;r++){
-    for(let c=0;c<world.width;c++){
-      const t = world.tiles[r][c];
-      if(!t || t==='A' || t==='g') continue;
-      const tr = getTileRect(world,c,r,t);
-      const x = tr.x - cx, y = tr.y - cy;
-      switch(t){
-        case 'b': ctx.fillStyle='#7a4f2d'; ctx.fillRect(x,y,TILE,TILE); break;
-        case 'B': ctx.fillStyle='#9b5e34'; ctx.fillRect(x,y,TILE,TILE); break;
-        case 'c': ctx.fillStyle='#ffd24d'; ctx.beginPath(); ctx.arc(x+TILE/2,y+TILE/2,8,0,Math.PI*2); ctx.fill(); break;
-        case '^': ctx.fillStyle='#c33'; ctx.fillRect(x+6,y+TILE-12, TILEx=20,12); break;
-        case 's': ctx.fillStyle='#66ddff'; ctx.fillRect(x+4,y+TILE-10,TILE-8,8); break;
-        case 'h': case 'v': ctx.fillStyle='#7a6fff'; ctx.fillRect(x,y,TILE,TILE); break;
-        case 'G': ctx.fillStyle='#5fd866'; ctx.fillRect(x+TILE/2-3,y,6,TILE); break;
-        case '#': ctx.strokeStyle='#fff4'; ctx.strokeRect(x+4,y+4,TILE-8,TILE-8); break;
-        case 'w': ctx.fillStyle='#333'; ctx.fillRect(x,y+TILE-6,TILE,6); break;
-      }
-    }
-  }
-
-  // draw player
-  const px = player.x - cx, py = player.y - cy;
+function drawTilePreview(ctx, t, x, y, w, h){
   ctx.save();
-  ctx.translate(px + player.w/2, py + player.h/2);
-  ctx.fillStyle = '#e33';
-  ctx.fillRect(-player.w/2, -player.h/2, player.w, player.h);
+  if(t==='A'){ ctx.fillStyle='#071022'; ctx.fillRect(x,y,w,h); ctx.strokeStyle='#0006'; ctx.strokeRect(x+1,y+1,w-2,h-2); }
+  else if(t==='b'){ ctx.fillStyle='#7a4f2d'; ctx.fillRect(x,y,w,h); ctx.fillStyle='#6a3f1d'; ctx.fillRect(x, y + Math.floor(h*0.6), w, Math.floor(h*0.4)); }
+  else if(t==='B'){ ctx.fillStyle='#9b5e34'; ctx.fillRect(x,y,w,h); ctx.fillStyle='#7a4f2d'; ctx.fillRect(x, y + Math.floor(h*0.6), w, Math.floor(h*0.4)); }
+  else if(t==='g'){ ctx.fillStyle='#4a3a2a'; ctx.fillRect(x,y,w,h); }
+  else if(t==='c'){ ctx.fillStyle='#ffd24d'; ctx.beginPath(); ctx.arc(x+w/2,y+h/2,Math.max(2,Math.min(w,h)/4),0,Math.PI*2); ctx.fill(); }
+  else if(t==='^'){ ctx.fillStyle='#c33'; ctx.beginPath(); ctx.moveTo(x+w/2,y+Math.max(2,h*0.15)); ctx.lineTo(x+Math.max(2,w*0.85),y+h-Math.max(2,h*0.15)); ctx.lineTo(x+Math.max(2,w*0.15),y+h-Math.max(2,h*0.15)); ctx.closePath(); ctx.fill(); }
+  else if(t==='s'){ ctx.fillStyle='#66ddff'; ctx.fillRect(x+Math.floor(w*0.12), y+Math.floor(h*0.6), Math.floor(w*0.76), Math.floor(h*0.28)); }
+  else if(t==='h' || t==='v'){ ctx.fillStyle='#7a6fff'; ctx.fillRect(x,y,w,h); }
+  else if(t==='w'){ ctx.fillStyle='#071022'; ctx.fillRect(x,y,w,h); ctx.fillStyle='#333'; ctx.fillRect(x, y + Math.floor(h*0.7), w, Math.floor(h*0.18)); }
+  else if(t==='G'){ ctx.fillStyle='#5fd866'; ctx.fillRect(x+Math.floor(w*0.25), y+Math.floor(h*0.12), Math.floor(w*0.5), Math.floor(h*0.76)); }
+  else if(t==='#'){ ctx.fillStyle='#111'; ctx.fillRect(x,y,w,h); ctx.strokeStyle='#fff4'; ctx.strokeRect(x+2,y+2,w-4,h-4); }
+  else { ctx.fillStyle='#071022'; ctx.fillRect(x,y,w,h); }
   ctx.restore();
-
-  // HUD
-  ctx.fillStyle = '#ffffffcc';
-  ctx.font = '14px system-ui';
-  ctx.fillText(`Coins: ${player.coins}  Pos: ${Math.floor(player.x)},${Math.floor(player.y)}`, 10, 20);
 }
 
-/* game loop */
-function loop(ts){
-  const dt = Math.min(0.033, (ts - lastTime)/1000);
-  lastTime = ts;
-  if(!paused && player && player.alive && !player.win){
-    updateMoving(world, dt);
-    updatePlayer(dt);
-  }
-  draw();
-  requestAnimationFrame(loop);
-}
-requestAnimationFrame(loop);
+/* helper functions */
+function status(msg){ statusEl.textContent = msg; setTimeout(()=>{ if(statusEl.textContent===msg) statusEl.textContent=''; },1400); }
 
-/* input */
-window.addEventListener('keydown', e=>{
-  keys.add(e.key);
-  if(e.key==='r' || e.key==='R') restartGame();
-  if(e.key==='p' || e.key==='P') togglePause();
-  if(e.key==='Enter' && player && !player.alive) restartGame();
-});
-window.addEventListener('keyup', e=> keys.delete(e.key));
-
-/* start / load functions */
-startGameBtn.addEventListener('click', ()=>{
-  const text = mapText.value.trim();
-  if(!text){ alert('No map text to load. Export or paste a map into the text area.'); return; }
-  const built = buildWorldFromText(text);
-  world = built.world; player = built.player;
-  camera.x = player.x; camera.y = player.y;
-  paused = false; player.alive = true; player.win = false;
-  statusEl.textContent = 'Playing';
-});
-restartGameBtn.addEventListener('click', ()=> restartGame());
-pauseGameBtn.addEventListener('click', ()=> togglePause());
-
-function restartGame(){
-  if(!mapText.value.trim()){ showStatus('No map loaded'); return; }
-  const built = buildWorldFromText(mapText.value);
-  world = built.world; player = built.player;
-  camera.x = player.x; camera.y = player.y;
-  paused = false; player.alive = true; player.win = false;
-  statusEl.textContent = 'Restarted';
-}
-function togglePause(){ paused = !paused; statusEl.textContent = paused ? 'Paused' : 'Playing'; }
-
-/* helper to show status */
-function showStatus(msg){ statusEl.textContent = msg; setTimeout(()=>{ if(statusEl.textContent===msg) statusEl.textContent=''; },1500); }
-
-/* menu switching */
-btnEditor.addEventListener('click', ()=>{ editorPanel.style.display='flex'; gamePanel.style.display='flex'; btnEditor.classList.add('primary'); btnPlay.classList.remove('primary'); });
-btnPlay.addEventListener('click', ()=>{ editorPanel.style.display='none'; gamePanel.style.display='flex'; btnPlay.classList.add('primary'); btnEditor.classList.remove('primary'); });
-
-/* load to game from editor */
-loadToGameBtn.addEventListener('click', ()=>{
-  updateMapText();
-  showStatus('Map loaded to game text area');
-});
-
-/* sample map generator (smaller than earlier but varied) */
+/* generate a small sample map */
 function generateSampleMap(W=120,H=15){
   const grid = Array.from({length:H}, ()=>Array.from({length:W}, ()=>'A'));
-  // ground
   for(let x=0;x<W;x++) grid[H-1][x] = (x%11===0)?'B':'b';
-  // ghost rooms
   for(let i=0;i<8;i++){
     const rw = 8 + Math.floor(Math.random()*18);
     const rh = 3 + Math.floor(Math.random()*5);
     const rx = 6 + Math.floor(Math.random()*(W-12-rw));
     const ry = 2 + Math.floor(Math.random()*(H-6-rh));
     for(let y=ry;y<ry+rh;y++) for(let x=rx;x<rx+rw;x++) grid[y][x] = 'g';
-    // door
     const dx = rx + Math.floor(Math.random()*(rw-2))+1;
     grid[ry+rh-1][dx] = 'A';
     if(Math.random()<0.6) grid[ry+1][rx+1] = 'c';
   }
-  // platforms & coins
   for(let seg=0; seg<Math.floor(W/12); seg++){
     const bx = seg*12 + 6;
     for(let x=bx; x<bx+8 && x<W-1; x+=2) grid[H-4][x] = (Math.random()<0.2)?'c':'b';
     if(Math.random()<0.2) grid[H-5][bx+3] = 'h';
   }
-  // start & goal
   grid[H-3][2] = '#';
   grid[H-4][W-6] = 'G';
   return grid.map(r=>r.join('')).join('\n');
 }
 
-/* initialize with sample */
+/* load into game text area (no automatic play) */
+loadToGame.addEventListener('click', ()=>{
+  updateMapText();
+  status('Map copied to text area');
+});
+
+/* Play button: save current map to localStorage and open playplatform.html */
+btnPlay.addEventListener('click', ()=>{
+  updateMapText();
+  const text = mapText.value || '';
+  try {
+    // Save map to localStorage so playplatform.html can read it
+    localStorage.setItem('playplatform_map', text);
+    // Open playplatform.html in a new tab
+    window.open('playplatform.html', '_blank');
+    status('Opening playplatform.html (map saved to localStorage)');
+  } catch (err) {
+    alert('Unable to save map to localStorage. You can copy the map text and paste it into playplatform.html manually.');
+  }
+});
+
+/* preview start/pause (simple visual feedback) */
+document.getElementById('startGame').addEventListener('click', ()=> status('Preview started (visual only)'));
+document.getElementById('pauseGame').addEventListener('click', ()=> status('Preview paused'));
+
+/* initial sample */
 mapText.value = generateSampleMap(120,15);
-mapText.dispatchEvent(new Event('change'));
-showStatus('Editor ready');
+loadFromText.click();
+renderPreview();
 </script>
 </body>
 </html>
